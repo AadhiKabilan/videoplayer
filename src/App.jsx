@@ -7,6 +7,33 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const videoRef = useRef();
+  const [selectedSubtitle, setSelectedSubtitle] = useState(null);
+  const [subtitleBlobUrl, setSubtitleBlobUrl] = useState(null);
+
+
+  useEffect(() => {
+  if (!selectedSubtitle) {
+    setSubtitleBlobUrl(null);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const vttText = reader.result;
+    const blob = new Blob([vttText], { type: 'text/vtt' });
+    const newUrl = URL.createObjectURL(blob);
+    setSubtitleBlobUrl(prevUrl => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return newUrl;
+    });
+  };
+  reader.readAsText(selectedSubtitle.file);
+
+  return () => {
+    if (subtitleBlobUrl) URL.revokeObjectURL(subtitleBlobUrl);
+  };
+}, [selectedSubtitle]);
+
 
   useEffect(() => {
     return () => {
@@ -32,8 +59,12 @@ function App() {
   };
 
   const handlePlay = (index) => {
-    setCurrentIndex(index);
-  };
+  const videoFile = videoFiles[index];
+  const defaultSubtitle = getMatchingSubtitle(videoFile);
+  setSelectedSubtitle(defaultSubtitle || null);
+  setCurrentIndex(index);
+};
+
 
   const handleClose = () => {
     if (videoRef.current) videoRef.current.pause();
@@ -123,26 +154,49 @@ function App() {
             >
               <X className="w-5 h-5" />
             </button>
-            <video
-              ref={videoRef}
-              src={videoFiles[currentIndex].url}
-              controls
-              autoPlay
-              className="w-full h-auto rounded"
-            >
-              {(() => {
-                const subtitle = getMatchingSubtitle(videoFiles[currentIndex]);
-                return subtitle ? (
-                  <track
-                    kind="subtitles"
-                    src={subtitle.url}
-                    srcLang="en"
-                    label="English"
-                    default
-                  />
-                ) : null;
-              })()}
-            </video>
+           <div className="bg-black p-4 rounded space-y-4">
+  <video
+    ref={videoRef}
+    src={videoFiles[currentIndex].url}
+    controls
+    autoPlay
+    className="w-full h-auto rounded"
+  >
+   {subtitleBlobUrl && (
+  <track
+    key={subtitleBlobUrl}
+    kind="subtitles"
+    src={subtitleBlobUrl}
+    srcLang="en"
+    label="English"
+    default
+  />
+)}
+
+  </video>
+
+  {subtitleFiles.length > 0 && (
+    <div className="mt-4 text-white">
+      <label className="block mb-1 font-semibold">Choose Subtitle:</label>
+      <select
+        value={selectedSubtitle ? selectedSubtitle.file.name : ''}
+        onChange={(e) => {
+          const selected = subtitleFiles.find(sub => sub.file.name === e.target.value);
+          setSelectedSubtitle(selected);
+        }}
+        className="bg-gray-800 border border-gray-600 rounded px-3 py-1 w-full text-white"
+      >
+        <option value="">-- None --</option>
+        {subtitleFiles.map((sub, i) => (
+          <option key={i} value={sub.file.name}>
+            {sub.file.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  )}
+</div>
+
           </div>
         </div>
       )}
